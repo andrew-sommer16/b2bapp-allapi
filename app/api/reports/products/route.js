@@ -82,9 +82,13 @@ export async function GET(request) {
         : (item.sku || item.product_name || 'Unknown');
 
       if (!groupMap[groupKey]) {
+        const parentName = prod?.name || item.product_name || groupKey;
+        const displayName = groupBy === 'product'
+          ? parentName
+          : (item.variant_label ? `${parentName} — ${item.variant_label}` : parentName);
         groupMap[groupKey] = {
           sku: groupBy === 'product' ? (prod?.sku || item.sku || '—') : (item.sku || '—'),
-          product_name: groupBy === 'product' ? (prod?.name || item.product_name || groupKey) : (item.product_name || item.sku),
+          product_name: displayName,
           product_id: item.product_id,
           brand: prod?.brand || null,
           category: prod?.category || null,
