@@ -11,6 +11,9 @@ export async function GET(request) {
   const companyStatus = searchParams.get('companyStatus') || 'all';
 
   try {
+    // Start catalog fetch immediately — it's independent of company IDs
+    const catalogPromise = fetchProductCatalog();
+
     let allCompanies = await fetchAllCompanies();
     if (companyStatus === 'active') allCompanies = allCompanies.filter(c => c.status === '1');
     else if (companyStatus === 'inactive') allCompanies = allCompanies.filter(c => ['0', '2', '3'].includes(c.status));
@@ -42,7 +45,7 @@ export async function GET(request) {
     // Fetch all line items + product catalog in parallel
     const [allLineItems, catalog] = await Promise.all([
       fetchLineItemsForOrders(orderIds),
-      fetchProductCatalog(),
+      catalogPromise,
     ]);
 
     // Filter line items to the requested product/sku

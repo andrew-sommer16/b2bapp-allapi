@@ -38,6 +38,9 @@ function LoginForm() {
         return;
       }
 
+      // Fire-and-forget cache warm so data is ready when the first report loads
+      fetch('/api/warm-cache', { method: 'POST' }).catch(() => {});
+
       router.push('/');
 
     } catch (err) {

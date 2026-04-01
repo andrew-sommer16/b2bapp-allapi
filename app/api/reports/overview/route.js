@@ -23,6 +23,9 @@ export async function GET(request) {
   }
 
   try {
+    // Kick off catalog fetch in parallel with companies — it doesn't depend on company IDs
+    const catalogPromise = fetchProductCatalog();
+
     // Fetch all companies live from BC API
     let allCompanies = await fetchAllCompanies();
 
@@ -118,7 +121,7 @@ export async function GET(request) {
       const orderIds = orders.map(o => o.bc_order_id);
       const [lineItems, catalog] = await Promise.all([
         fetchLineItemsForOrders(orderIds),
-        fetchProductCatalog(),
+        catalogPromise,
       ]);
 
       const catalogMap = {};

@@ -19,6 +19,9 @@ export async function GET(request) {
   }
 
   try {
+    // Start catalog fetch immediately — it's independent of company IDs
+    const catalogPromise = fetchProductCatalog();
+
     let allCompanies = await fetchAllCompanies();
 
     if (companyStatus === 'active') allCompanies = allCompanies.filter(c => c.status === '1');
@@ -48,7 +51,7 @@ export async function GET(request) {
 
     const [lineItems, catalog] = await Promise.all([
       fetchLineItemsForOrders(orderIds),
-      fetchProductCatalog(),
+      catalogPromise,
     ]);
 
     const catalogMap = {};
