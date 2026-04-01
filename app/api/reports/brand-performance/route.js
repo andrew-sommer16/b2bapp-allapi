@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
-  fetchAllCompanies, fetchAllSalesReps,
+  fetchAllCompanies,
   fetchB2BOrdersForCompanies, fetchLineItemsForOrders,
   fetchProductCatalog, parseList,
 } from '@/lib/bcDirectAPI';
@@ -22,7 +22,6 @@ export async function GET(request) {
   }
 
   try {
-    // Start catalog in parallel — independent of company IDs
     const catalogPromise = fetchProductCatalog();
 
     let allCompanies = await fetchAllCompanies();
@@ -45,6 +44,12 @@ export async function GET(request) {
       });
     }
 
+    // Build a lookup of companyId → company name for fast joining
+    const companyLookup = {};
+    allCompanies.forEach(c => {
+      companyLookup[c.bc_company_id] = c.company_name;
+    });
+
     const companyIds = allCompanies.map(c => c.bc_company_id);
     let orders = await fetchB2BOrdersForCompanies(companyIds, { dateFrom, dateTo });
     orders = orders.filter(o =>
@@ -60,6 +65,10 @@ export async function GET(request) {
       });
     }
 
+    // Map orderId → companyId for line item joining
+    const orderCompanyMap = {};
+    orders.forEach(o => { orderCompanyMap[o.bc_order_id] = o.company_id; });
+
     const orderIds = orders.map(o => o.bc_order_id);
     const [lineItems, catalog] = await Promise.all([
       fetchLineItemsForOrders(orderIds),
@@ -71,11 +80,14 @@ export async function GET(request) {
 
     // ── Aggregate by brand ──────────────────────────────────────────────────
     const brandMap = {};
+
     lineItems.forEach(item => {
       const prod = item.product_id ? catalogMap[item.product_id] : null;
       const brandName = prod?.brand || 'Unbranded';
       const revenue = item.line_total || 0;
       const units = item.quantity || 0;
+      const companyId = orderCompanyMap[item.bc_order_id];
+      const companyName = companyId ? (companyLookup[companyId] || companyId) : null;
 
       if (!brandMap[brandName]) {
         brandMap[brandName] = {
@@ -84,12 +96,29 @@ export async function GET(request) {
           units: 0,
           orderIds: new Set(),
           products: {},
+          companiesBought: {},   // companyId → { name, revenue, units, orders }
         };
       }
 
       brandMap[brandName].revenue += revenue;
       brandMap[brandName].units += units;
       brandMap[brandName].orderIds.add(item.bc_order_id);
+
+      // Track per-company stats for this brand
+      if (companyId && companyName) {
+        if (!brandMap[brandName].companiesBought[companyId]) {
+          brandMap[brandName].companiesBought[companyId] = {
+            company_id: companyId,
+            company_name: companyName,
+            revenue: 0,
+            units: 0,
+            orderIds: new Set(),
+          };
+        }
+        brandMap[brandName].companiesBought[companyId].revenue += revenue;
+        brandMap[brandName].companiesBought[companyId].units += units;
+        brandMap[brandName].companiesBought[companyId].orderIds.add(item.bc_order_id);
+      }
 
       // Track top products per brand
       const productKey = prod?.name || item.product_name || item.sku || 'Unknown';
@@ -108,20 +137,44 @@ export async function GET(request) {
     const totalRevenue = Object.values(brandMap).reduce((s, b) => s + b.revenue, 0);
     const totalUnits = Object.values(brandMap).reduce((s, b) => s + b.units, 0);
 
+    // Set of all company IDs in scope (for "not bought" calculation)
+    const allCompanyIds = new Set(companyIds);
+
     const brands = Object.values(brandMap)
-      .map(b => ({
-        name: b.name,
-        revenue: Math.round(b.revenue * 100) / 100,
-        spend: Math.round(b.revenue * 100) / 100, // alias for pie chart
-        units: b.units,
-        orders: b.orderIds.size,
-        pct: totalRevenue > 0 ? Math.round((b.revenue / totalRevenue) * 10000) / 100 : 0,
-        avgOrderValue: b.orderIds.size > 0 ? Math.round(b.revenue / b.orderIds.size) : 0,
-        topProducts: Object.values(b.products)
-          .sort((a, b) => b.revenue - a.revenue)
-          .slice(0, 5)
-          .map(p => ({ ...p, revenue: Math.round(p.revenue * 100) / 100 })),
-      }))
+      .map(b => {
+        const boughtIds = new Set(Object.keys(b.companiesBought));
+
+        const companiesBought = Object.values(b.companiesBought)
+          .map(c => ({
+            company_id: c.company_id,
+            company_name: c.company_name,
+            revenue: Math.round(c.revenue * 100) / 100,
+            units: c.units,
+            orders: c.orderIds.size,
+          }))
+          .sort((a, b) => b.revenue - a.revenue);
+
+        const companiesNotBought = allCompanies
+          .filter(c => !boughtIds.has(c.bc_company_id))
+          .map(c => ({ company_id: c.bc_company_id, company_name: c.company_name }))
+          .sort((a, b) => a.company_name.localeCompare(b.company_name));
+
+        return {
+          name: b.name,
+          revenue: Math.round(b.revenue * 100) / 100,
+          spend: Math.round(b.revenue * 100) / 100,
+          units: b.units,
+          orders: b.orderIds.size,
+          pct: totalRevenue > 0 ? Math.round((b.revenue / totalRevenue) * 10000) / 100 : 0,
+          avgOrderValue: b.orderIds.size > 0 ? Math.round(b.revenue / b.orderIds.size) : 0,
+          topProducts: Object.values(b.products)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5)
+            .map(p => ({ ...p, revenue: Math.round(p.revenue * 100) / 100 })),
+          companiesBought,
+          companiesNotBought,
+        };
+      })
       .sort((a, b) => b.revenue - a.revenue);
 
     const topBrand = brands[0]?.name || null;

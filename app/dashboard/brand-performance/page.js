@@ -157,6 +157,125 @@ function BrandBarChart({ brands, loading }) {
   );
 }
 
+function ExpandedBrandRow({ brand }) {
+  const [tab, setTab] = useState('products');
+
+  const Tab = ({ id, label, count }) => (
+    <button
+      onClick={() => setTab(id)}
+      className={`px-4 py-2 text-xs font-semibold rounded-t-md transition-colors ${
+        tab === id
+          ? 'bg-white text-blue-700 border border-b-white border-gray-200 -mb-px'
+          : 'text-gray-500 hover:text-gray-700'
+      }`}
+    >
+      {label}
+      <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${tab === id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+        {count}
+      </span>
+    </button>
+  );
+
+  return (
+    <tr className="bg-gray-50">
+      <td colSpan={7} className="px-8 pt-3 pb-5">
+        {/* Tab bar */}
+        <div className="flex gap-1 border-b border-gray-200 mb-0">
+          <Tab id="products" label="Top Products" count={brand.topProducts?.length || 0} />
+          <Tab id="bought" label="Companies Bought" count={brand.companiesBought?.length || 0} />
+          <Tab id="notbought" label="Companies Not Bought" count={brand.companiesNotBought?.length || 0} />
+        </div>
+
+        <div className="bg-white border border-gray-200 border-t-0 rounded-b-lg overflow-hidden">
+          {/* Top Products tab */}
+          {tab === 'products' && (
+            brand.topProducts?.length === 0 ? (
+              <p className="text-sm text-gray-400 px-5 py-6">No product data available</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                    <th className="text-left px-5 py-3">Product</th>
+                    <th className="text-left px-5 py-3">SKU</th>
+                    <th className="text-right px-5 py-3">Revenue</th>
+                    <th className="text-right px-5 py-3">Units</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {brand.topProducts.map(p => (
+                    <tr key={p.sku} className="hover:bg-gray-50">
+                      <td className="px-5 py-3 text-gray-800 font-medium">{p.name}</td>
+                      <td className="px-5 py-3 text-gray-500 font-mono text-xs">{p.sku}</td>
+                      <td className="px-5 py-3 text-right text-gray-900">{fmtFull(p.revenue)}</td>
+                      <td className="px-5 py-3 text-right text-gray-700">{p.units.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+
+          {/* Companies Bought tab */}
+          {tab === 'bought' && (
+            brand.companiesBought?.length === 0 ? (
+              <p className="text-sm text-gray-400 px-5 py-6">No companies purchased this brand in the selected period</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                    <th className="text-left px-5 py-3">Company</th>
+                    <th className="text-right px-5 py-3">Revenue</th>
+                    <th className="text-right px-5 py-3">Units</th>
+                    <th className="text-right px-5 py-3">Orders</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {brand.companiesBought.map(c => (
+                    <tr key={c.company_id} className="hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-900">{c.company_name}</td>
+                      <td className="px-5 py-3 text-right text-gray-900">{fmtFull(c.revenue)}</td>
+                      <td className="px-5 py-3 text-right text-gray-700">{c.units.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right text-gray-700">{c.orders}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+
+          {/* Companies Not Bought tab */}
+          {tab === 'notbought' && (
+            brand.companiesNotBought?.length === 0 ? (
+              <p className="text-sm text-gray-400 px-5 py-6">All companies have purchased this brand</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                    <th className="text-left px-5 py-3">Company</th>
+                    <th className="px-5 py-3 text-xs text-gray-400 font-normal text-left">No purchases of this brand in the selected period</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {brand.companiesNotBought.map(c => (
+                    <tr key={c.company_id} className="hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-900">{c.company_name}</td>
+                      <td className="px-5 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-50 text-red-600 font-medium">
+                          No purchases
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function BrandTable({ brands, loading }) {
   const [sort, setSort] = useState({ key: 'revenue', dir: 'desc' });
   const [search, setSearch] = useState('');
@@ -256,35 +375,7 @@ function BrandTable({ brands, loading }) {
                 </tr>
 
                 {expanded === brand.name && (
-                  <tr key={`${brand.name}-expanded`} className="bg-blue-50">
-                    <td colSpan={7} className="px-8 py-4">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Top Products — {brand.name}</p>
-                      {brand.topProducts?.length === 0 ? (
-                        <p className="text-sm text-gray-400">No product data available</p>
-                      ) : (
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="text-xs text-gray-500 uppercase tracking-wider">
-                              <th className="text-left pb-2 pr-6">Product</th>
-                              <th className="text-left pb-2 pr-6">SKU</th>
-                              <th className="text-right pb-2 pr-6">Revenue</th>
-                              <th className="text-right pb-2">Units</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-blue-100">
-                            {brand.topProducts.map(p => (
-                              <tr key={p.sku} className="hover:bg-blue-100">
-                                <td className="py-2 pr-6 text-gray-800 font-medium">{p.name}</td>
-                                <td className="py-2 pr-6 text-gray-500 font-mono text-xs">{p.sku}</td>
-                                <td className="py-2 pr-6 text-right text-gray-900">{fmtFull(p.revenue)}</td>
-                                <td className="py-2 text-right text-gray-700">{p.units.toLocaleString()}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </td>
-                  </tr>
+                  <ExpandedBrandRow key={`${brand.name}-expanded`} brand={brand} />
                 )}
               </>
             ))}
