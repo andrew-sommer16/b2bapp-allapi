@@ -6,6 +6,7 @@ import { useGlobalFilters } from '@/lib/filterContext';
 import { exportToCsv } from '@/lib/exportCsv';
 import Pagination from '@/components/Pagination';
 import { Suspense } from 'react';
+import { useFetch } from '@/lib/useFetch';
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -74,8 +75,6 @@ function StatusDistribution({ dist }) {
 }
 
 function CompanyAnalyticsInner() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('all');
   const [sort, setSort] = useState({ key: 'health_score', dir: 'asc' });
@@ -86,25 +85,20 @@ function CompanyAnalyticsInner() {
   const router = useRouter();
   const { buildFilterQS, dateFrom, dateTo, dateField, customerGroups, extraFieldFilters, setFilterOptions, companyStatus } = useGlobalFilters();
 
+  const url = user?.store_hash
+    ? `/api/reports/company-analytics?${buildFilterQS({ store_hash: user.store_hash, page, limit })}`
+    : null;
+  const { data, loading } = useFetch(url);
+
+  // Sync filter options to global context whenever data arrives
   useEffect(() => {
-    if (!user?.store_hash) return;
-    setLoading(true);
-    const qs = buildFilterQS({ store_hash: user.store_hash, page, limit });
-    fetch(`/api/reports/company-analytics?${qs}`)
-      .then(r => r.json())
-      .then(d => {
-        setData(d);
-        setLoading(false);
-        // Update global filter options from this response
-        if (d.extraFieldOptions || d.customerGroupOptions) {
-          setFilterOptions({
-            extraFieldOptions: d.extraFieldOptions || {},
-            customerGroupOptions: d.customerGroupOptions || {},
-          });
-        }
-      })
-      .catch(() => setLoading(false));
-  }, [user, page, companyStatus, dateFrom, dateTo, dateField, customerGroups, extraFieldFilters]);
+    if (data?.extraFieldOptions || data?.customerGroupOptions) {
+      setFilterOptions({
+        extraFieldOptions: data.extraFieldOptions || {},
+        customerGroupOptions: data.customerGroupOptions || {},
+      });
+    }
+  }, [data]);
 
   useEffect(() => { setPage(1); }, [search, tierFilter]);
 

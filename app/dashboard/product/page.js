@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { useGlobalFilters } from '@/lib/filterContext';
 import { exportToCsv } from '@/lib/exportCsv';
 import { Suspense } from 'react';
+import { useFetch } from '@/lib/useFetch';
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n || 0);
 const fmtWhole = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
@@ -47,8 +48,6 @@ function ProductDetailInner() {
   const searchParams = useSearchParams();
   const { user } = useCurrentUser();
   const { buildFilterQS, dateFrom, dateTo, dateField } = useGlobalFilters();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState({ key: 'total_spend', dir: 'desc' });
   const [search, setSearch] = useState('');
 
@@ -56,19 +55,15 @@ function ProductDetailInner() {
   const product_id = searchParams.get('product_id');
   const mode = searchParams.get('mode') || 'sku';
 
-  useEffect(() => {
-    if (!user?.store_hash) return;
-    setLoading(true);
+  const url = user?.store_hash ? (() => {
     const base = buildFilterQS({ store_hash: user.store_hash });
     const extra = new URLSearchParams();
     extra.set('mode', mode);
     if (sku) extra.set('sku', sku);
     if (product_id) extra.set('product_id', product_id);
-    fetch(`/api/reports/product?${base}&${extra.toString()}`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [user, sku, product_id, mode, dateFrom, dateTo, dateField]);
+    return `/api/reports/product?${base}&${extra.toString()}`;
+  })() : null;
+  const { data, loading } = useFetch(url);
 
   const product = data?.product;
   const s = data?.scorecards || {};

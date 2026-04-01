@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { useRouter } from 'next/navigation';
 import { useGlobalFilters } from '@/lib/filterContext';
 import { exportToCsv } from '@/lib/exportCsv';
 import { Suspense } from 'react';
+import { useFetch } from '@/lib/useFetch';
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
 const COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#eab308'];
@@ -38,8 +39,6 @@ const SkeletonRow = () => (
 );
 
 function ProductsPageInner() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [cfFilterOpen, setCfFilterOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [topX, setTopX] = useState(25);
@@ -50,16 +49,10 @@ function ProductsPageInner() {
   const { buildFilterQS, dateFrom, dateTo, dateField, customerGroups, extraFieldFilters: globalExtraFilters, companyStatus } = useGlobalFilters();
   const router = useRouter();
 
-  const buildQS = () => buildFilterQS({ store_hash: user.store_hash, limit: topX, groupBy, ...Object.fromEntries(Object.entries(customFieldFilters).filter(([,v]) => v.length).map(([k,v]) => [`cf_${encodeURIComponent(k)}`, v.join(",")])) });
-
-  useEffect(() => {
-    if (!user?.store_hash) return;
-    setLoading(true);
-    fetch(`/api/reports/products?${buildQS()}`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [user, companyStatus, dateFrom, dateTo, dateField, topX, groupBy, customFieldFilters, customerGroups, globalExtraFilters]);
+  const url = user?.store_hash
+    ? `/api/reports/products?${buildFilterQS({ store_hash: user.store_hash, limit: topX, groupBy, ...Object.fromEntries(Object.entries(customFieldFilters).filter(([,v]) => v.length).map(([k,v]) => [`cf_${encodeURIComponent(k)}`, v.join(",")])) })}`
+    : null;
+  const { data, loading } = useFetch(url);
 
   const s = data?.scorecards || {};
   const allProducts = data?.products || [];

@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { useGlobalFilters } from '@/lib/filterContext';
 import { exportToCsv } from '@/lib/exportCsv';
 import { Suspense } from 'react';
+import { useFetch } from '@/lib/useFetch';
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n || 0);
 const fmtWhole = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
@@ -39,22 +40,15 @@ function CompanyDetailInner() {
   const router = useRouter();
   const { user } = useCurrentUser();
   const { buildFilterQS, dateFrom, dateTo, dateField } = useGlobalFilters();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sort, setSort] = useState({ key: 'created_at_bc', dir: 'desc' });
 
-  useEffect(() => {
-    if (!user?.store_hash) return;
-    setLoading(true);
-    const qs = buildFilterQS({ store_hash: user.store_hash });
-    fetch(`/api/reports/company/${id}?${qs}`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [id, user, dateFrom, dateTo, dateField]);
+  const url = user?.store_hash
+    ? `/api/reports/company/${id}?${buildFilterQS({ store_hash: user.store_hash })}`
+    : null;
+  const { data, loading } = useFetch(url);
 
   const company = data?.company;
   const s = data?.scorecards || {};

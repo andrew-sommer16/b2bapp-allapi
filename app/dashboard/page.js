@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { useGlobalFilters } from '@/lib/filterContext';
-import { Suspense } from 'react';
 import { exportToCsv } from '@/lib/exportCsv';
+import { useFetch } from '@/lib/useFetch';
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
 const COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6'];
@@ -92,20 +92,13 @@ function SpreadSection({ title, data, loading, filename }) {
 }
 
 function OverviewPageInner() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const { user } = useCurrentUser();
   const { buildFilterQS, dateFrom, dateTo, dateField, customerGroups, extraFieldFilters, companyStatus } = useGlobalFilters();
 
-  useEffect(() => {
-    if (!user?.store_hash) return;
-    setLoading(true);
-    const qs = buildFilterQS({ store_hash: user.store_hash });
-    fetch(`/api/reports/overview?${qs}`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [user, companyStatus, dateFrom, dateTo, dateField, customerGroups, extraFieldFilters]);
+  const url = user?.store_hash
+    ? `/api/reports/overview?${buildFilterQS({ store_hash: user.store_hash })}`
+    : null;
+  const { data, loading } = useFetch(url);
 
   const s = data?.scorecards || {};
 
