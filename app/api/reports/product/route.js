@@ -97,7 +97,11 @@ export async function GET(request) {
       lineItems.forEach(item => {
         const s = item.sku || 'Unknown';
         if (!skuAgg[s]) {
-          skuAgg[s] = { sku: s, product_name: item.product_name, order_count: new Set(), total_quantity: 0, total_spend: 0, last_order_date: null };
+          // Show the variant label (e.g. "Bangin' Peach") on the detail page since
+          // the user already knows which parent product they clicked into.
+          // Fall back to the SKU if no label is available.
+          const variantName = item.variant_label || item.sku || item.product_name || 'Unknown';
+          skuAgg[s] = { sku: s, product_name: variantName, order_count: new Set(), total_quantity: 0, total_spend: 0, last_order_date: null };
         }
         skuAgg[s].order_count.add(item.bc_order_id);
         skuAgg[s].total_quantity += parseInt(item.quantity || 0);
