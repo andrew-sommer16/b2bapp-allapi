@@ -10,6 +10,7 @@ const navItems = [
   { href: '/dashboard', label: 'Overview', icon: '📊' },
   { href: '/dashboard/company-analytics', label: 'Company Analytics', icon: '🏢' },
   { href: '/dashboard/products', label: 'Product Performance', icon: '🏷️' },
+  { href: '/dashboard/brand-performance', label: 'Brand Performance', icon: '⭐' },
   { href: '/dashboard/settings', label: 'Settings', icon: '⚙️' },
 ];
 
