@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { useRouter } from 'next/navigation';
 import { useGlobalFilters } from '@/lib/filterContext';
@@ -74,6 +74,15 @@ function ProductsPageInner() {
     });
 
   const chartData = [...allProducts].sort((a, b) => b.total_revenue - a.total_revenue).slice(0, 10);
+
+  const sortedForPie = [...allProducts].sort((a, b) => b.total_revenue - a.total_revenue);
+  const top8 = sortedForPie.slice(0, 8);
+  const otherRevenue = sortedForPie.slice(8).reduce((s, p) => s + p.total_revenue, 0);
+  const PIE_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#9ca3af'];
+  const pieData = [
+    ...top8.map(p => ({ name: p.sku || p.product_name || 'Unknown', value: p.total_revenue })),
+    ...(otherRevenue > 0 ? [{ name: 'Other', value: Math.round(otherRevenue * 100) / 100 }] : []),
+  ];
 
   const handleSort = (key) => setSort(s => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
   const SortIcon = ({ col }) => {
@@ -170,21 +179,54 @@ function ProductsPageInner() {
         )}
       </div>
 
-      {/* Chart */}
+      {/* Charts */}
       {!loading && chartData.length > 0 && (
-        <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-widest">Top 10 by Revenue</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="sku" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.length > 12 ? v.slice(0, 12) + '…' : v} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v) => [fmt(v), 'Revenue']} contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }} />
-              <Bar dataKey="total_revenue" radius={[4, 4, 0, 0]}>
-                {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="grid grid-cols-2 gap-4">
+          {/* Pie Chart — Revenue Share */}
+          <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+            <h2 className="text-sm font-semibold text-gray-700 mb-1 uppercase tracking-widest">
+              Revenue Share — {groupBy === 'sku' ? 'Top SKUs' : 'Top Products'}
+            </h2>
+            <p className="text-xs text-gray-400 mb-4">Top 8 + Other</p>
+            <div className="flex gap-4 items-center">
+              <div className="flex-shrink-0">
+                <PieChart width={180} height={180}>
+                  <Pie data={pieData} cx={85} cy={85} innerRadius={50} outerRadius={82} paddingAngle={2} dataKey="value">
+                    {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v) => [fmt(v), 'Revenue']} contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }} />
+                </PieChart>
+              </div>
+              <div className="flex-1 space-y-1.5 min-w-0">
+                {pieData.map((entry, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs text-gray-600 gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="truncate">{entry.name}</span>
+                    </div>
+                    <span className="font-semibold text-gray-800 flex-shrink-0">{fmt(entry.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Bar Chart — Top 10 */}
+          <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+            <h2 className="text-sm font-semibold text-gray-700 mb-1 uppercase tracking-widest">Top 10 by Revenue</h2>
+            <p className="text-xs text-gray-400 mb-4">{groupBy === 'sku' ? 'By Variant SKU' : 'By Parent Product'}</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="sku" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v && v.length > 10 ? v.slice(0, 10) + '…' : (v || '—')} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v) => [fmt(v), 'Revenue']} contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }} />
+                <Bar dataKey="total_revenue" radius={[4, 4, 0, 0]}>
+                  {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 

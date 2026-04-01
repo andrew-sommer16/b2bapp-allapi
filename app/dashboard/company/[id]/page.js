@@ -6,6 +6,7 @@ import { useGlobalFilters } from '@/lib/filterContext';
 import { exportToCsv } from '@/lib/exportCsv';
 import { Suspense } from 'react';
 import { useFetch } from '@/lib/useFetch';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n || 0);
 const fmtWhole = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
@@ -56,6 +57,22 @@ function CompanyDetailInner() {
 
   // Get unique statuses for filter tabs
   const statuses = [...new Set(allOrders.map(o => o.custom_status).filter(Boolean))];
+
+  // Build product revenue map from all order line items (for pie chart)
+  const PIE_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#9ca3af'];
+  const productRevMap = {};
+  allOrders.forEach(order => {
+    (order.line_items || []).forEach(item => {
+      const key = item.product_name || item.sku || 'Unknown';
+      productRevMap[key] = (productRevMap[key] || 0) + (item.line_total || 0);
+    });
+  });
+  const sortedProds = Object.entries(productRevMap).sort((a, b) => b[1] - a[1]);
+  const otherProdRev = sortedProds.slice(8).reduce((s, [, v]) => s + v, 0);
+  const companyPieData = [
+    ...sortedProds.slice(0, 8).map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 })),
+    ...(otherProdRev > 0 ? [{ name: 'Other', value: Math.round(otherProdRev * 100) / 100 }] : []),
+  ];
 
   const filtered = allOrders
     .filter(o => statusFilter === 'all' || o.custom_status === statusFilter)
@@ -165,6 +182,35 @@ function CompanyDetailInner() {
                 <p className="text-sm font-medium text-gray-800">{value}</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Product Mix Pie Chart */}
+      {!loading && companyPieData.length > 0 && (
+        <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1 uppercase tracking-widest">Product Mix</h2>
+          <p className="text-xs text-gray-400 mb-5">Revenue by product — top 8 + other</p>
+          <div className="flex gap-6 items-center">
+            <div className="flex-shrink-0">
+              <PieChart width={200} height={200}>
+                <Pie data={companyPieData} cx={95} cy={95} innerRadius={55} outerRadius={90} paddingAngle={2} dataKey="value">
+                  {companyPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(v) => [fmtWhole(v), 'Revenue']} contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }} />
+              </PieChart>
+            </div>
+            <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-2 min-w-0">
+              {companyPieData.map((entry, i) => (
+                <div key={i} className="flex items-center justify-between text-xs text-gray-600 gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                    <span className="truncate">{entry.name}</span>
+                  </div>
+                  <span className="font-semibold text-gray-800 flex-shrink-0 ml-2">{fmtWhole(entry.value)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
