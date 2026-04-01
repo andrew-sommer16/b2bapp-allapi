@@ -43,7 +43,7 @@ export async function GET(request) {
     orders.forEach(o => { orderMap[o.bc_order_id] = o; });
 
     // Fetch all line items + product catalog in parallel
-    const [allLineItems, catalog] = await Promise.all([
+    const [allLineItems, { products: catalogProducts, variantLabelMap }] = await Promise.all([
       fetchLineItemsForOrders(orderIds),
       catalogPromise,
     ]);
@@ -56,7 +56,7 @@ export async function GET(request) {
 
     // Get product info from catalog
     const catalogMap = {};
-    catalog.forEach(p => { catalogMap[p.bc_product_id] = p; });
+    catalogProducts.forEach(p => { catalogMap[p.bc_product_id] = p; });
     const productInfo = product_id ? catalogMap[product_id] : null;
 
     // Aggregate by company
@@ -97,10 +97,9 @@ export async function GET(request) {
       lineItems.forEach(item => {
         const s = item.sku || 'Unknown';
         if (!skuAgg[s]) {
-          // Show the variant label (e.g. "Bangin' Peach") on the detail page since
-          // the user already knows which parent product they clicked into.
-          // Fall back to the SKU if no label is available.
-          const variantName = item.variant_label || item.sku || item.product_name || 'Unknown';
+          // Show the variant label on the detail page — prefer catalog source,
+          // fall back to order line item label, then SKU.
+          const variantName = (item.sku && variantLabelMap[item.sku]) || item.variant_label || item.sku || item.product_name || 'Unknown';
           skuAgg[s] = { sku: s, product_name: variantName, order_count: new Set(), total_quantity: 0, total_spend: 0, last_order_date: null };
         }
         skuAgg[s].order_count.add(item.bc_order_id);

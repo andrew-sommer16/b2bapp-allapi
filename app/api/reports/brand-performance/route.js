@@ -70,13 +70,13 @@ export async function GET(request) {
     orders.forEach(o => { orderCompanyMap[o.bc_order_id] = o.company_id; });
 
     const orderIds = orders.map(o => o.bc_order_id);
-    const [lineItems, catalog] = await Promise.all([
+    const [lineItems, { products: catalogProducts }] = await Promise.all([
       fetchLineItemsForOrders(orderIds),
       catalogPromise,
     ]);
 
     const catalogMap = {};
-    catalog.forEach(p => { catalogMap[p.bc_product_id] = p; });
+    catalogProducts.forEach(p => { catalogMap[p.bc_product_id] = p; });
 
     // ── Aggregate by brand ──────────────────────────────────────────────────
     const brandMap = {};

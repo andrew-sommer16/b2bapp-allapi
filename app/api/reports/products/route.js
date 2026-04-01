@@ -49,17 +49,17 @@ export async function GET(request) {
     const orderDateMap = {};
     orders.forEach(o => { orderDateMap[o.bc_order_id] = o.created_at_bc; });
 
-    const [lineItems, catalog] = await Promise.all([
+    const [lineItems, { products: catalogProducts, variantLabelMap }] = await Promise.all([
       fetchLineItemsForOrders(orderIds),
       catalogPromise,
     ]);
 
     const catalogMap = {};
-    catalog.forEach(p => { catalogMap[p.bc_product_id] = p; });
+    catalogProducts.forEach(p => { catalogMap[p.bc_product_id] = p; });
 
     // Build dynamic custom field options from ALL catalog products
     const customFieldOptions = {};
-    catalog.forEach(p => {
+    catalogProducts.forEach(p => {
       Object.entries(p.custom_fields || {}).forEach(([k, v]) => {
         if (!customFieldOptions[k]) customFieldOptions[k] = new Set();
         if (v) customFieldOptions[k].add(v);
@@ -70,7 +70,7 @@ export async function GET(request) {
     // Filter by product custom fields if needed
     const hasCustomFieldFilters = Object.keys(customFieldFilters).length > 0;
     const allowedProductIds = hasCustomFieldFilters
-      ? new Set(catalog.filter(p => Object.entries(customFieldFilters).every(([f, vals]) => vals.includes(p.custom_fields?.[f]))).map(p => p.bc_product_id))
+      ? new Set(catalogProducts.filter(p => Object.entries(customFieldFilters).every(([f, vals]) => vals.includes(p.custom_fields?.[f]))).map(p => p.bc_product_id))
       : null;
 
     const groupMap = {};
@@ -83,9 +83,11 @@ export async function GET(request) {
 
       if (!groupMap[groupKey]) {
         const parentName = prod?.name || item.product_name || groupKey;
+        // Prefer catalog variant label (most reliable), fall back to order line item label
+        const variantLabel = (item.sku && variantLabelMap[item.sku]) || item.variant_label || null;
         const displayName = groupBy === 'product'
           ? parentName
-          : (item.variant_label ? `${parentName} — ${item.variant_label}` : parentName);
+          : (variantLabel ? `${parentName} — ${variantLabel}` : parentName);
         groupMap[groupKey] = {
           sku: groupBy === 'product' ? (prod?.sku || item.sku || '—') : (item.sku || '—'),
           product_name: displayName,

@@ -119,13 +119,13 @@ export async function GET(request) {
 
     if (orders.length > 0) {
       const orderIds = orders.map(o => o.bc_order_id);
-      const [lineItems, catalog] = await Promise.all([
+      const [lineItems, { products: catalogProducts }] = await Promise.all([
         fetchLineItemsForOrders(orderIds),
         catalogPromise,
       ]);
 
       const catalogMap = {};
-      catalog.forEach(p => { catalogMap[p.bc_product_id] = p; });
+      catalogProducts.forEach(p => { catalogMap[p.bc_product_id] = p; });
 
       const catMap = {};
       const brandMap = {};
